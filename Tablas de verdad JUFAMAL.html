@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Constructor de Tablas de Verdad</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+            position: relative;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #911a30; /* Guindo */
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #6b1324; /* Guindo más oscuro */
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #808080;
+            color: white;
+        }
+        td {
+            background-color: white;
+        }
+        .true-value {
+            font-weight: bold;
+        }
+        .false-value {
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #dc3545;
+            border-radius: 4px;
+            background-color: #fff8f8;
+        }
+        .result-type {
+            margin: 10px 0;
+            font-weight: bold;
+            color: #911a30; /* Guindo */
+        }
+        .final-result-true {
+            background-color: #90EE90; /* Verde */
+            color: #006400;
+            font-weight: bold;
+        }
+        .final-result-false {
+            background-color: #FF0000; /* Rojo */
+            color: white;
+            font-weight: bold;
+        }
+        .info-box {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #911a30; /* Guindo */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-size: 14px;
+            line-height: 1.5;
+            z-index: 1000;
+        }
+        .info-box p {
+            margin: 5px 0;
+        }
+        .watermark {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-size: 48px; /* Aumentado a 48px */
+            font-weight: bold;
+            color: rgba(145, 26, 48, 0.2); /* Guindo con transparencia */
+            transform: none; /* Eliminada la rotación */
+            z-index: 1000;
+            pointer-events: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="info-box">
+        <p><strong>Docente:</strong> Ariel Aguilar</p>
+        <p><strong>Estudiante:</strong> Justin Fabricio Marquez Alanoca</p>
+        <p><strong>Carrera:</strong> Ingeniería de Sistemas Informáticos</p>
+        <p><strong>UNIVALLE</strong></p>
+    </div>
+
+    <div class="watermark">
+        JUFAMAL
+    </div>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const TruthTableBuilder = () => {
+            const [expression, setExpression] = React.useState('');
+            const [table, setTable] = React.useState(null);
+            const [error, setError] = React.useState('');
+            const [type, setType] = React.useState('');
+
+            const extractVariables = React.useCallback((expr) => {
+                const variables = new Set();
+                expr.split('').forEach(char => {
+                    if (/[A-Za-z]/.test(char) && !['v', 'y', 'o', 'n'].includes(char.toLowerCase())) {
+                        variables.add(char);
+                    }
+                });
+                return Array.from(variables).sort();
+            }, []);
+
+            const evaluateExpression = React.useCallback((expr, values) => {
+                let evaluation = expr;
+                Object.entries(values).forEach(([variable, value]) => {
+                    evaluation = evaluation.replaceAll(variable, value ? '1' : '0');
+                });
+
+                try {
+                    evaluation = evaluation
+                        .replace(/no\s*1/g, '0')
+                        .replace(/no\s*0/g, '1')
+                        .replace(/1\s*y\s*1/g, '1')
+                        .replace(/[01]\s*y\s*0/g, '0')
+                        .replace(/0\s*y\s*[01]/g, '0')
+                        .replace(/[01]\s*o\s*1/g, '1')
+                        .replace(/1\s*o\s*[01]/g, '1')
+                        .replace(/0\s*o\s*0/g, '0');
+
+                    return evaluation === '1';
+                } catch {
+                    return null;
+                }
+            }, []);
+
+            const generateTable = React.useCallback(() => {
+                if (!expression.trim()) {
+                    setError('Por favor ingresa una expresión');
+                    return;
+                }
+
+                try {
+                    const variables = extractVariables(expression);
+                    if (variables.length === 0) {
+                        setError('No se encontraron variables válidas');
+                        return;
+                    }
+
+                    const rows = [];
+                    const combinations = 2 ** variables.length;
+
+                    for (let i = 0; i < combinations; i++) {
+                        const values = {};
+                        variables.forEach((variable, index) => {
+                            values[variable] = Boolean((i >> (variables.length - 1 - index)) & 1);
+                        });
+
+                        const result = evaluateExpression(expression.toLowerCase(), values);
+                        if (result === null) {
+                            throw new Error('Error al evaluar la expresión');
+                        }
+
+                        rows.push({ values, result });
+                    }
+
+                    setTable({ variables, rows });
+                    setError('');
+
+                    const allTrue = rows.every(row => row.result);
+                    const allFalse = rows.every(row => !row.result);
+
+                    if (allTrue) {
+                        setType('tautología');
+                    } else if (allFalse) {
+                        setType('contradicción');
+                    } else {
+                        setType('contingencia');
+                    }
+
+                } catch (err) {
+                    setError('Error en la expresión. Verifica la sintaxis.');
+                    setTable(null);
+                }
+            }, [expression, extractVariables, evaluateExpression]);
+
+            return (
+                <div className="container">
+                    <h1>Constructor de Tablas de Verdad</h1>
+                    
+                    <div className="input-group">
+                        <input
+                            placeholder="Ingresa una expresión lógica (ej: 'P y Q o no R')"
+                            value={expression}
+                            onChange={(e) => setExpression(e.target.value)}
+                        />
+                        <button onClick={generateTable}>
+                            Generar Tabla
+                        </button>
+                    </div>
+
+                    {error && (
+                        <div className="error">
+                            {error}
+                        </div>
+                    )}
+
+                    {table && (
+                        <>
+                            <div className="result-type">
+                                Esta expresión es una {type}
+                            </div>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            {table.variables.map(variable => (
+                                                <th key={variable}>
+                                                    {variable}
+                                                </th>
+                                            ))}
+                                            <th>Resultado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {table.rows.map((row, index) => (
+                                            <tr key={index}>
+                                                {table.variables.map(variable => (
+                                                    <td key={variable}>
+                                                        {row.values[variable] ? 'V' : 'F'}
+                                                    </td>
+                                                ))}
+                                                <td className={row.result ? 'final-result-true' : 'final-result-false'}>
+                                                    {row.result ? 'V' : 'F'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<TruthTableBuilder />);
+    </script>
+</body>
+</html>
